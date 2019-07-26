@@ -183,6 +183,7 @@ namespace KellermanSoftware.CompareNetObjects.IgnoreOrderTypes
                         $"Invalid CollectionMatchingSpec.  No such property {item} for type {currentObject.GetType().Name} ");
                 }
 
+                
                 var propertyValue = info.GetValue(currentObject, null);
 
                 if (result.Config.TreatStringEmptyAndNullTheSame && info.PropertyType == typeof(string) && propertyValue == null)
@@ -192,6 +193,15 @@ namespace KellermanSoftware.CompareNetObjects.IgnoreOrderTypes
                 else if (propertyValue != null && result.Config.CaseSensitive == false && info.PropertyType == typeof(string))
                 {
                     propertyValue = ((string)propertyValue).ToLowerInvariant();
+                }
+
+#if NETSTANDARD
+                else if (propertyValue.GetType().GetTypeInfo().IsClass && !TypeHelper.IsSimpleType(propertyValue.GetType()) )
+#else
+                else if (propertyValue.GetType().IsClass  && !TypeHelper.IsSimpleType(propertyValue.GetType()))
+#endif
+                {
+                    propertyValue = ParseClassContents(propertyValue);
                 }
 
                 if (propertyValue == null)
@@ -209,6 +219,25 @@ namespace KellermanSoftware.CompareNetObjects.IgnoreOrderTypes
                 sb.Append(RespectNumberToString(currentObject));
 
             return sb.ToString().TrimEnd(',');
+        }
+
+        private string ParseClassContents(object value)
+        {
+            if (value == null)
+                return null;
+            var builder = new StringBuilder();
+            builder.Append(value.GetType().Name + ":[");
+            foreach (var prop in value.GetType().GetProperties())
+            {
+                builder.Append($"[{prop.Name},");
+                //if (prop.GetType().Namespace == "System") // Do we need recursion for these? Is that overkill?
+                    builder.Append(prop.GetValue(value, null) + "]");
+                //else
+                //    builder.Append(ParseClassContents(prop.GetValue(value, null)) + "]");
+            }
+
+            builder.Append("]");
+            return builder.ToString();
         }
 
         private static string RespectNumberToString(object o)
@@ -254,7 +283,7 @@ namespace KellermanSoftware.CompareNetObjects.IgnoreOrderTypes
 
             //Make a key out of primitive types, date, decimal, string, guid, and enum of the class
             List<string> list = Cache.GetPropertyInfo(result.Config, type)
-                .Where(o => o.CanWrite && (TypeHelper.IsSimpleType(o.PropertyType) || TypeHelper.IsEnum(o.PropertyType)))
+                .Where(o => (TypeHelper.IsSimpleType(o.PropertyType) || TypeHelper.IsEnum(o.PropertyType) || TypeHelper.IsClass(o.PropertyType)))
                 .Select(o => o.Name).ToList();
             
             //Remove members to ignore in the key

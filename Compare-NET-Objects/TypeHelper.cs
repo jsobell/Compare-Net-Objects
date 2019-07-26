@@ -364,8 +364,8 @@ namespace KellermanSoftware.CompareNetObjects
                    || type == typeof(DateTime)
                    || type == typeof(string)
                    || type == typeof(Guid)
-                   || type == typeof(Decimal);
-
+                   || type == typeof(Decimal)
+                ;
         }
 
         /// <summary>
